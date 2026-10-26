@@ -1,0 +1,420 @@
+
+{% extends "base.html" %}
+
+{% block title %}Overview{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and monitoring status -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">ACCESS CONTROL</div>
+        <h1>Security overview</h1>
+        <p>
+            Live application telemetry, access decisions, and configuration checks.
+        </p>
+    </div>
+
+    <span class="status-pill">
+        <span class="dot"></span>
+        Application monitoring
+    </span>
+</div>
+
+<!-- Display key application statistics -->
+<div class="stats">
+
+    <article class="card stat">
+        <small>Total users</small>
+        <strong>{{ users_count }}</strong>
+        <span>Registered accounts</span>
+    </article>
+
+    <article class="card stat">
+        <small>Active roles</small>
+        <strong>{{ role_count }}</strong>
+        <span>Flat RBAC model</span>
+    </article>
+
+    <article class="card stat">
+        <small>Events today</small>
+        <strong>{{ recent_events }}</strong>
+        <span>From stored audit records</span>
+    </article>
+
+    <article class="card stat">
+        <small>Open findings</small>
+        <strong class="{{ 'danger' if open_findings else '' }}">
+            {{ open_findings }}
+        </strong>
+        <span>Security items not resolved</span>
+    </article>
+
+</div>
+
+<!-- Arrange the security score and activity chart -->
+<div class="security-dashboard-grid">
+
+    <!-- Display the security posture score and configuration checks -->
+    <section class="card security-score-card">
+
+        <div class="section-title">
+            <div>
+                <h2>Application security posture</h2>
+                <p>Calculated from the checks shown below.</p>
+            </div>
+
+            <i class="fa-solid fa-shield-halved section-icon"></i>
+        </div>
+
+        <!-- Show the overall security score -->
+        <div class="score-layout">
+
+            <div class="score-ring" style="--score: {{ security_score }}">
+                <div>
+                    <strong>{{ security_score }}</strong>
+                    <span>/100</span>
+                </div>
+            </div>
+
+            <div class="score-summary">
+                <strong>{{ security_label }}</strong>
+
+                <p>
+                    This score evaluates Passme's application settings and
+                    stored password hashes. It does not scan the host computer
+                    or prove the system is vulnerability-free.
+                </p>
+
+                <!-- Summarize passed checks and critical findings -->
+                <span class="score-note">
+                    {{ security_checks|selectattr('passed')|list|length }}
+                    of {{ security_checks|length }} configuration checks passed
+                    {% if critical_findings %}
+                        ; {{ critical_findings }} unresolved critical finding(s)
+                    {% endif %}.
+                </span>
+            </div>
+
+        </div>
+
+        <!-- List the results of individual security checks -->
+        <div class="security-check-list">
+
+            {% for check in security_checks %}
+            <div class="security-check">
+
+                <span class="check-icon {{ 'passed' if check.passed else 'failed' }}">
+                    <i class="fa-solid {{ 'fa-check' if check.passed else 'fa-xmark' }}"></i>
+                </span>
+
+                <div>
+                    <strong>{{ check.name }}</strong>
+                    <small>{{ check.detail }}</small>
+                </div>
+
+                <span class="check-status {{ 'passed' if check.passed else 'failed' }}">
+                    {{ 'PASS' if check.passed else 'REVIEW' }}
+                </span>
+
+            </div>
+            {% endfor %}
+
+            <!-- Highlight unresolved critical findings -->
+            {% if critical_findings %}
+            <div class="security-check">
+
+                <span class="check-icon failed">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </span>
+
+                <div>
+                    <strong>Critical findings</strong>
+                    <small>
+                        {{ critical_findings }} unresolved critical finding(s)
+                        need attention.
+                    </small>
+                </div>
+
+                <a class="check-status failed" href="{{ url_for('security_centre') }}">
+                    REVIEW
+                </a>
+
+            </div>
+            {% endif %}
+
+        </div>
+
+    </section>
+
+    <!-- Display hourly access activity from audit records -->
+    <section class="card activity-card">
+
+        <div class="section-title">
+            <div>
+                <h2>Access activity · last 24 hours</h2>
+                <p>Hourly totals from recorded audit events.</p>
+            </div>
+
+            <!-- Show audit logs only to authorized users -->
+            {% if can('view_audit') %}
+            <a class="btn secondary" href="{{ url_for('audit_logs') }}">
+                Audit logs
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Explain the chart's activity categories -->
+        <div class="chart-legend">
+            <span>
+                <i class="legend-dot granted"></i>
+                Granted / successful
+            </span>
+
+            <span>
+                <i class="legend-dot blocked"></i>
+                Denied / failed
+            </span>
+        </div>
+
+        <!-- Provide the canvas for the activity chart -->
+        <div class="activity-chart-wrap">
+            <canvas
+                id="activity-chart"
+                aria-label="Hourly successful and blocked access events over the last 24 hours"
+                role="img"
+            ></canvas>
+        </div>
+
+        <!-- Display the chart time zone and event total -->
+        <div class="chart-foot">
+            <span>
+                <i class="fa-regular fa-clock"></i>
+                Server-local time
+            </span>
+
+            <span>
+                {{ activity|sum(attribute='total') }}
+                event(s) in displayed window
+            </span>
+        </div>
+
+        <!-- Pass chart data from Flask to JavaScript -->
+        <script type="application/json" id="activity-data">{{ activity|tojson }}</script>
+
+    </section>
+
+</div>
+
+<!-- Display the latest recorded access events -->
+<div class="card">
+
+    <div class="section-title">
+        <div>
+            <h2>Recent access activity</h2>
+            <p>
+                Latest authentication and authorization events stored by Passme.
+            </p>
+        </div>
+
+        <!-- Provide access to the full audit log when permitted -->
+        {% if can('view_audit') %}
+        <a class="btn secondary" href="{{ url_for('audit_logs') }}">
+            View all audit logs
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Show recent events in a table -->
+    <div class="table-wrap">
+        <table>
+
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Resource</th>
+                    <th>Time</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for log in audit_logs %}
+                <tr>
+                    <td>{{ log.user_name }}</td>
+                    <td>{{ log.action }}</td>
+                    <td>{{ log.resource }}</td>
+                    <td>{{ log.event_time }}</td>
+
+                    <td>
+                        <span class="badge {{ log.result|lower }}">
+                            {{ log.result }}
+                        </span>
+                    </td>
+                </tr>
+
+                {% else %}
+                <!-- Show a message when no audit events exist -->
+                <tr>
+                    <td colspan="5">
+                        No events recorded yet. Activity will appear here as
+                        users sign in and use the application.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
+</div>
+
+<!-- Draw the hourly access activity chart -->
+<script>
+(function () {
+    // Find the chart canvas and its JSON data.
+    const node = document.getElementById('activity-data');
+    const canvas = document.getElementById('activity-chart');
+
+    if (!node || !canvas) return;
+
+    // Parse the activity data supplied by Flask.
+    let rows = [];
+
+    try {
+        rows = JSON.parse(node.textContent || '[]');
+    } catch (e) {
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Render the chart at the canvas's current display size.
+    function draw() {
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(300, canvas.clientWidth);
+        const height = 250;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+
+        // Define the chart's drawing boundaries.
+        const pad = {
+            left: 35,
+            right: 12,
+            top: 14,
+            bottom: 35
+        };
+
+        const plotW = width - pad.left - pad.right;
+        const plotH = height - pad.top - pad.bottom;
+
+        // Calculate a suitable vertical scale for the data.
+        const maxValue = Math.max(
+            4,
+            ...rows.map(r => Math.max(r.granted, r.blocked))
+        );
+
+        const step = Math.max(1, Math.ceil(maxValue / 4));
+        const yMax = step * 4;
+
+        // Draw the horizontal grid lines and vertical-axis labels.
+        ctx.font = '10px Inter, system-ui, sans-serif';
+        ctx.textBaseline = 'middle';
+
+        for (let i = 0; i <= 4; i++) {
+            const y = pad.top + plotH - (i / 4) * plotH;
+
+            ctx.strokeStyle = 'rgba(125,157,190,.18)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(pad.left, y);
+            ctx.lineTo(width - pad.right, y);
+            ctx.stroke();
+
+            ctx.fillStyle = '#8097b6';
+            ctx.textAlign = 'right';
+            ctx.fillText(
+                String(Math.round(yMax * i / 4)),
+                pad.left - 8,
+                y
+            );
+        }
+
+        // Convert data indexes and values into chart coordinates.
+        const x = i =>
+            pad.left +
+            (rows.length <= 1 ? 0 : i / (rows.length - 1)) * plotW;
+
+        const y = value =>
+            pad.top + plotH - (value / yMax) * plotH;
+
+        // Draw a data line and markers for one activity category.
+        function line(key, color) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.4;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+
+            rows.forEach((r, i) => {
+                const xx = x(i);
+                const yy = y(r[key]);
+
+                if (i === 0) {
+                    ctx.moveTo(xx, yy);
+                } else {
+                    ctx.lineTo(xx, yy);
+                }
+            });
+
+            ctx.stroke();
+
+            rows.forEach((r, i) => {
+                if (r[key] > 0) {
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x(i), y(r[key]), 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        // Plot successful and blocked access events.
+        line('granted', '#22d3a6');
+        line('blocked', '#fb6177');
+
+        // Add time labels at selected points along the horizontal axis.
+        ctx.fillStyle = '#8097b6';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        const indexes = [
+            0,
+            Math.floor((rows.length - 1) / 4),
+            Math.floor((rows.length - 1) / 2),
+            Math.floor(3 * (rows.length - 1) / 4),
+            rows.length - 1
+        ];
+
+        [...new Set(indexes)].forEach(i => {
+            ctx.fillText(
+                rows[i].label,
+                x(i),
+                pad.top + plotH + 12
+            );
+        });
+    }
+
+    // Draw the chart and redraw it when the window resizes.
+    draw();
+
+    window.addEventListener('resize', draw);
+})();
+</script>
+
+{% endblock %}
