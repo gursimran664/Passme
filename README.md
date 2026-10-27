@@ -85,9 +85,9 @@ The application initialises its SQLite database and required tables when started
 
 ## Passwords to login our application
 passme@gursimran
-123456789passme
+12345678passme
 or passme@parth
-123456789passme
+12345678passme
 
 ## 🔐 Security
 
