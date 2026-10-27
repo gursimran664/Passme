@@ -18,7 +18,7 @@ Passme is a Flask-based web application developed as an educational cybersecurit
 
 ## 🛠️ Technology Stack
 
-Python · Flask · SQLite · bcrypt · HTML · CSS · JavaScript · Jinja
+Python · Flask · SQLite · bcrypt · HTML
 
 ## 📂 Project Structure
 
@@ -40,47 +40,44 @@ passme/
     ├── security_centre.html
     ├── settings.html
     └── error.html
-```
 
-## 🚀 Installation
 
-### 1. Clone the repository
+🚀 Installation
 
-```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
-cd YOUR-REPOSITORY
-```
+1. Clone the repository
 
-Replace the placeholders with your actual GitHub username and repository name.
+bash
+https://github.com/gursimran664/Passme/tree/main
 
-### 2. Create a virtual environment
 
-**Windows PowerShell**
+2. Create a virtual environment
 
-```powershell
+Windows PowerShell
+
+`powershell
 py -3 -m venv .venv
 .venv\Scripts\Activate.ps1
-```
 
-**Linux or macOS**
 
-```bash
+Linux or macOS
+
+bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
 
-### 3. Install dependencies
 
-```bash
+3. Install dependencies
+
+bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
 
-### 4. Run Passme
 
-```bash
+4. Run Passme
+
+bash
 python app.py
-```
+
 The application initialises its SQLite database and required tables when started.
 
 ## Passwords to login our application
@@ -89,27 +86,20 @@ passme@gursimran
 or passme@parth
 12345678passme
 
-## 🔐 Security
+🔐 Security
 
 Passme demonstrates password hashing, server-side access-control checks, CSRF protection, session security, failed-login lockout, and security-event logging.
 
 The Security Centre uses configured detection rules to identify selected suspicious requests. These detections are intended for educational purposes and do not replace a professional security assessment or a full intrusion detection system.
 
-**Before publishing:** Remove hardcoded demo credentials from the source code, and ensure the database contains no private account or audit information. Never commit passwords, secret keys, email credentials, or other sensitive configuration to a public repository.
+👨‍💻 Team
 
-## ⚠️ Limitations
+- Gursimran Singh
+- Parth
 
-Passme is an educational project, not a production identity-management system. Some visual assets require an internet connection, and the application does not currently implement multi-factor authentication (MFA) or Attribute-Based Access Control (ABAC).
-
-## 👨‍💻 Team
-
-- **Gursimran Singh**
-- **Parth**
-
-## 🎯 Project Objective
+🎯 Project Objective
 
 The objective of Passme is to demonstrate practical web application security by combining authentication, role-based permissions, local data storage, audit trails, and security monitoring in one application.
 
----
 
 *An educational project focused on access control and web application security.*
