@@ -81,12 +81,13 @@ python -m pip install -r requirements.txt
 ```bash
 python app.py
 ```
-
-Open your browser and visit:
-
-**http://127.0.0.1:5000**
-
 The application initialises its SQLite database and required tables when started.
+
+## Passwords to login our application
+passme@gursimran
+123456789passme
+or passme@parth
+123456789passme
 
 ## 🔐 Security
 
