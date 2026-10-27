@@ -47,7 +47,7 @@ passme/
 1. Clone the repository
 
 bash
-https://github.com/gursimran664/Passme/tree/main
+https://github.com/gursimran664/Passme
 
 
 2. Create a virtual environment
