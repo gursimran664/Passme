@@ -1,0 +1,292 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>{% block title %}Passme{% endblock %} · Access Control</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    >
+</head>
+
+<body>
+
+{% if current_user %}
+
+<div class="app-layout">
+
+    <aside class="sidebar">
+
+        <a class="brand" href="{{ url_for('overview') }}">
+            <i class="fa-solid fa-shield-halved"></i>
+            Passme
+        </a>
+
+        <nav>
+
+            {% if can('view_overview') %}
+            <a
+                class="{{ 'active' if request.endpoint == 'overview' else '' }}"
+                href="{{ url_for('overview') }}"
+            >
+                <i class="fa-solid fa-grid-2"></i>
+                Overview
+            </a>
+            {% endif %}
+
+            {% if can('manage_users') %}
+            <a
+                class="{{ 'active' if request.endpoint == 'users' else '' }}"
+                href="{{ url_for('users') }}"
+            >
+                <i class="fa-solid fa-users"></i>
+                Users
+            </a>
+            {% endif %}
+
+            {% if can('view_roles') %}
+            <a
+                class="{{ 'active' if request.endpoint == 'roles' else '' }}"
+                href="{{ url_for('roles') }}"
+            >
+                <i class="fa-solid fa-shield-halved"></i>
+                Roles &amp; Permissions
+            </a>
+            {% endif %}
+
+            {% if can('view_audit') %}
+            <a
+                class="{{ 'active' if request.endpoint in ['audit_logs', 'export_csv'] else '' }}"
+                href="{{ url_for('audit_logs') }}"
+            >
+                <i class="fa-solid fa-clipboard-list"></i>
+                Audit Logs
+            </a>
+            {% endif %}
+
+            {% if can('manage_findings') %}
+            <a
+                class="{{ 'active' if request.endpoint in ['security_centre', 'resolve_finding'] else '' }}"
+                href="{{ url_for('security_centre') }}"
+            >
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Security Centre
+            </a>
+            {% endif %}
+
+            {% if can('manage_settings') %}
+            <a
+                class="{{ 'active' if request.endpoint == 'settings' else '' }}"
+                href="{{ url_for('settings') }}"
+            >
+                <i class="fa-solid fa-gear"></i>
+                Settings
+            </a>
+            {% endif %}
+
+        </nav>
+
+        <form
+            class="logout-form"
+            method="post"
+            action="{{ url_for('logout') }}"
+        >
+            <input
+                type="hidden"
+                name="_csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <button type="submit" class="nav-logout">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                Sign out
+            </button>
+        </form>
+
+        <div class="sidebar-foot">
+
+            <div>
+                <span class="dot"></span>
+                Session protected
+            </div>
+
+            <small>{{ current_user.role }}</small>
+
+            <div class="sidebar-clock" id="live-clock">
+                --:--:--
+            </div>
+
+            <small
+                id="session-countdown"
+                class="session-countdown"
+            >
+                Session ends in --:--
+            </small>
+
+        </div>
+
+    </aside>
+
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div class="topbar-context">
+                <span class="topbar-kicker">
+                    PASSME / SECURITY OPERATIONS
+                </span>
+
+                <span class="topbar-subtitle">
+                    Access control workspace
+                </span>
+            </div>
+
+            <div class="topbar-right">
+
+                <div class="profile">
+
+                    <span class="avatar">
+                        {{ current_user.name.split()[0][0] }}{{ current_user.name.split()[-1][0] }}
+                    </span>
+
+                    <span>
+                        {{ current_user.name }}
+                        <small>{{ current_user.role }}</small>
+                    </span>
+
+                </div>
+
+            </div>
+
+        </header>
+
+        <section class="content">
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                <div class="flash {{ category }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+
+        </section>
+
+    </main>
+
+</div>
+
+<!-- Flask-generated configuration for the session timer -->
+<div
+    id="session-config"
+    data-expiry="{{ ((session_expires_at * 1000) | int) if session_expires_at else '' }}"
+    data-login-url="{{ url_for('login') }}"
+    hidden
+></div>
+
+<script>
+(function () {
+    "use strict";
+
+    // Update the sidebar clock once per second.
+    const clock = document.getElementById("live-clock");
+
+    function updateClock() {
+        if (!clock) {
+            return;
+        }
+
+        clock.textContent = new Date().toLocaleTimeString([], {
+            hour12: false
+        });
+    }
+
+    updateClock();
+
+    window.setInterval(updateClock, 1000);
+
+    // Read Flask-generated values from the HTML data attributes.
+    const sessionConfig = document.getElementById("session-config");
+
+    const expiryValue = sessionConfig
+        ? sessionConfig.dataset.expiry
+        : "";
+
+    const expiry = expiryValue !== ""
+        ? Number(expiryValue)
+        : null;
+
+    const loginUrl = sessionConfig
+        ? sessionConfig.dataset.loginUrl
+        : "/login";
+
+    const countdown = document.getElementById("session-countdown");
+
+    const logoutForm = document.querySelector(".logout-form");
+
+    // Start the countdown only when a valid expiry timestamp exists.
+    if (
+        expiry !== null &&
+        Number.isFinite(expiry) &&
+        countdown
+    ) {
+        let submitted = false;
+
+        function updateSessionTimer() {
+            const remaining = Math.max(
+                0,
+                Math.ceil((expiry - Date.now()) / 1000)
+            );
+
+            const minutes = Math.floor(remaining / 60);
+            const seconds = remaining % 60;
+
+            countdown.textContent =
+                "Session ends in " +
+                String(minutes).padStart(2, "0") +
+                ":" +
+                String(seconds).padStart(2, "0");
+
+            // Handle session expiration once.
+            if (remaining <= 0 && !submitted) {
+                submitted = true;
+
+                countdown.textContent = "Session expired";
+
+                if (logoutForm) {
+                    // Submit the POST form with its CSRF token.
+                    logoutForm.requestSubmit();
+                } else {
+                    // Redirect if the logout form is unavailable.
+                    window.location.href = loginUrl;
+                }
+            }
+        }
+
+        updateSessionTimer();
+
+        window.setInterval(updateSessionTimer, 1000);
+    }
+})();
+</script>
+
+{% else %}
+
+    {% block public_content %}{% endblock %}
+
+{% endif %}
+
+</body>
+</html>

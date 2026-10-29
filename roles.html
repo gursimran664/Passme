@@ -1,0 +1,118 @@
+
+{% extends "base.html" %}
+
+{% block title %}Roles & Permissions{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and description -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">ACCESS CONTROL</div>
+        <h1>Roles & permissions</h1>
+        <p>
+            Review non-hierarchical roles and evaluate sample access decisions.
+        </p>
+    </div>
+</div>
+
+<!-- Display available roles and their user and permission counts -->
+<div class="role-grid">
+    {% for role in roles %}
+    <a
+        class="card role-card {% if selected_role == role %}selected{% endif %}"
+        href="{{ url_for('roles', role=role) }}"
+    >
+        <strong>{{ role }}</strong>
+
+        <span>
+            {{ role_counts[role] }} user(s) ·
+            {{ role_perms_count[role] }} permissions
+        </span>
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Show role permissions and the access decision tester -->
+<div class="two-col">
+
+    <!-- List the permissions assigned to the selected role -->
+    <div class="card">
+        <h2>{{ selected_role }} permissions</h2>
+
+        <p class="muted">
+            Permissions available to this role in this MVP.
+        </p>
+
+        {% for perm in permissions %}
+        <div class="permission">
+            <span>
+                <strong>{{ perm[0] }}</strong>
+                <small>{{ perm[1] }}</small>
+            </span>
+
+            <span class="badge granted">Listed</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Provide a form to test the configured role policy -->
+    <div class="card">
+        <h2>Access decision tester</h2>
+
+        <p class="muted">
+            This tests the application's configured role policy.
+        </p>
+
+        <form method="post">
+
+            <!-- Include the CSRF protection token -->
+            <input
+                type="hidden"
+                name="_csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <!-- Select the role to evaluate -->
+            <label>
+                Role
+
+                <select name="role">
+                    {% for role in roles %}
+                    <option {% if selected_role == role %}selected{% endif %}>
+                        {{ role }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <!-- Select the protected action to test -->
+            <label>
+                Protected action
+
+                <select name="action">
+                    <option>Access protected files</option>
+                    <option>Manage users</option>
+                    <option>Export audit logs</option>
+                </select>
+            </label>
+
+            <!-- Submit the access evaluation request -->
+            <button class="btn primary full" type="submit">
+                Evaluate access
+            </button>
+        </form>
+
+        <!-- Display the result returned by the access evaluator -->
+        {% if evaluation_result %}
+        <div class="evaluation {{ evaluation_result.status|lower }}">
+            <strong>{{ evaluation_result.status }}</strong>
+            <br>
+            {{ evaluation_result.message }}
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{% endblock %}
