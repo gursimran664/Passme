@@ -1,0 +1,91 @@
+
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and security controls status -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">ACCESS CONTROL / CONFIGURATION</div>
+        <h1>System settings</h1>
+        <p>Configure session security, login protection, and live audit monitoring.</p>
+    </div>
+
+    <span class="status-pill">
+        <span class="dot"></span>
+        Security controls
+    </span>
+</div>
+
+<!-- Configure and save the application's security settings -->
+<div class="card settings-card">
+
+    <h2>Security controls</h2>
+
+    <p class="muted">
+        Changes are stored in the local Passme database and applied by the application.
+    </p>
+
+    <form method="post">
+
+        <!-- Include the CSRF protection token -->
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Configure the session expiration timeout -->
+        <label>Session timeout
+            <select name="session_timeout">
+                <option value="5" {% if settings.session_timeout|string == '5' %}selected{% endif %}>5 minutes</option>
+                <option value="15" {% if settings.session_timeout|string == '15' %}selected{% endif %}>15 minutes</option>
+                <option value="30" {% if settings.session_timeout|string == '30' %}selected{% endif %}>30 minutes</option>
+            </select>
+
+            <small class="field-help">
+                Your session expires after the selected time from sign-in, even if you keep using the app. Saving a new value updates the current session countdown immediately.
+            </small>
+        </label>
+
+        <!-- Enable or disable protection against repeated failed logins -->
+        <label class="check-row">
+            <span>
+                <strong>Failed-login protection</strong>
+                <small>
+                    Temporarily blocks sign-in after five failed attempts for the same email within 15 minutes. A successful login resets the counter.
+                </small>
+            </span>
+
+            <input
+                type="checkbox"
+                name="failed_login_protection"
+                {% if settings.failed_login_protection %}checked{% endif %}
+            >
+        </label>
+
+        <!-- Enable or disable automatic audit feed updates -->
+        <label class="check-row">
+            <span>
+                <strong>Live audit feed</strong>
+                <small>
+                    Controls automatic refresh on the Audit Logs page. Security events continue to be saved even when live display updates are paused.
+                </small>
+            </span>
+
+            <input
+                type="checkbox"
+                name="real_time_audit"
+                {% if settings.real_time_audit %}checked{% endif %}
+            >
+        </label>
+
+        <!-- Submit the updated security settings -->
+        <button class="btn primary" type="submit">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Save changes
+        </button>
+
+    </form>
+
+</div>
+
+{% endblock %}

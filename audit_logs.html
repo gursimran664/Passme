@@ -1,0 +1,327 @@
+
+{% extends "base.html" %}
+
+{% block title %}Audit Logs{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and export action -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">SECURITY OPERATIONS / TELEMETRY</div>
+        <h1>Audit logs</h1>
+        <p>Authentication and authorization events recorded by Passme.</p>
+    </div>
+
+    <div class="heading-actions">
+        <span class="status-pill">
+            <span class="dot"></span>
+            Audit trail active
+        </span>
+
+        {% if can('export_audit') %}
+        <a class="btn secondary" href="{{ url_for('export_csv') }}">
+            <i class="fa-solid fa-download"></i>
+            Export CSV
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Live audit feed connection status -->
+<div class="telemetry-banner">
+    <div class="telemetry-icon">
+        <i class="fa-solid fa-wave-square"></i>
+    </div>
+
+    <div class="telemetry-copy">
+        <strong>Live event stream</strong>
+        <span>
+            New events are checked automatically while this page is open.
+        </span>
+    </div>
+
+    <div class="feed-status" id="feed-status">
+        <span class="pulse-dot"></span>
+        <span id="feed-status-text">Connecting…</span>
+    </div>
+</div>
+
+<!-- Audit statistics -->
+<div class="stats audit-stats">
+    <article class="card stat">
+        <div class="stat-icon blue">
+            <i class="fa-solid fa-list-check"></i>
+        </div>
+        <small>Events loaded</small>
+        <strong id="event-count">{{ logs|length }}</strong>
+        <span>Latest records</span>
+    </article>
+
+    <article class="card stat">
+        <div class="stat-icon green">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <small>Successful decisions</small>
+        <strong id="granted-count">
+            {{ logs|selectattr('result', 'equalto', 'Granted')|list|length }}
+        </strong>
+        <span>Granted</span>
+    </article>
+
+    <article class="card stat">
+        <div class="stat-icon red">
+            <i class="fa-solid fa-shield-virus"></i>
+        </div>
+        <small>Failed / denied</small>
+        <strong id="failed-count">
+            {{ logs|selectattr('result', 'in', ['Failed', 'Denied'])|list|length }}
+        </strong>
+        <span>Review recommended</span>
+    </article>
+
+    <article class="card stat">
+        <div class="stat-icon violet">
+            <i class="fa-solid fa-arrows-rotate"></i>
+        </div>
+        <small>Last sync</small>
+        <strong class="sync-time" id="sync-time">Waiting</strong>
+        <span>Automatic refresh</span>
+    </article>
+</div>
+
+<!-- Audit event table and manual refresh button -->
+<div class="card audit-card">
+    <div class="section-title">
+        <div>
+            <h2>
+                <i class="fa-solid fa-terminal section-icon"></i>
+                Event stream
+            </h2>
+            <p>Most recent security events, newest first.</p>
+        </div>
+
+        <button class="btn secondary" id="refresh-feed" type="button">
+            <i class="fa-solid fa-rotate"></i>
+            Refresh now
+        </button>
+    </div>
+
+    <!-- Audit records rendered by Flask and updated by JavaScript -->
+    <div class="table-wrap">
+        <table id="audit-table">
+            <thead>
+                <tr>
+                    <th>USER / ACTOR</th>
+                    <th>EVENT</th>
+                    <th>RESOURCE</th>
+                    <th>TIMESTAMP</th>
+                    <th>RESULT</th>
+                </tr>
+            </thead>
+
+            <tbody id="audit-rows">
+                {% for log in logs %}
+                <tr>
+                    <td>
+                        <div class="actor-cell">
+                            <span class="actor-avatar">
+                                {{ log.user_name[:1]|upper }}
+                            </span>
+                            <span>{{ log.user_name }}</span>
+                        </div>
+                    </td>
+
+                    <td>{{ log.action }}</td>
+                    <td>{{ log.resource }}</td>
+                    <td class="timestamp-cell">{{ log.event_time }}</td>
+
+                    <td>
+                        <span class="badge {{ log.result|lower }}">
+                            {{ log.result }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        No audit events yet. Actions in Passme will appear here.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Audit feed refresh information -->
+    <div class="table-foot">
+        <span>
+            Updates every 8 seconds while real-time audit is enabled.
+        </span>
+
+        <span>
+            <span class="pulse-dot"></span>
+            <span id="feed-foot-status">Waiting for sync</span>
+        </span>
+    </div>
+</div>
+
+<!-- Live audit feed polling and table update logic -->
+<script>
+(function () {
+    const body = document.getElementById('audit-rows');
+    const status = document.getElementById('feed-status-text');
+    const foot = document.getElementById('feed-foot-status');
+    const sync = document.getElementById('sync-time');
+
+    let lastTopId = null;
+    let busy = false;
+
+    // Escape values before inserting them into the table.
+    function safe(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[c]));
+    }
+
+    // Convert result names into safe CSS class names.
+    function resultClass(value) {
+        return String(value || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '');
+    }
+
+    // Render audit records and update the statistics.
+    function render(logs) {
+        body.innerHTML = '';
+
+        if (!logs.length) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        No audit events yet. Actions in Passme will appear here.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        logs.forEach((log, index) => {
+            const tr = document.createElement('tr');
+
+            if (
+                index === 0 &&
+                lastTopId !== null &&
+                Number(log.id) > lastTopId
+            ) {
+                tr.className = 'new-event-row';
+            }
+
+            tr.innerHTML =
+                '<td><div class="actor-cell">' +
+                    '<span class="actor-avatar">' +
+                        safe((log.user_name || '?').slice(0, 1).toUpperCase()) +
+                    '</span>' +
+                    '<span>' + safe(log.user_name) + '</span>' +
+                '</div></td>' +
+                '<td>' + safe(log.action) + '</td>' +
+                '<td>' + safe(log.resource) + '</td>' +
+                '<td class="timestamp-cell">' + safe(log.event_time) + '</td>' +
+                '<td><span class="badge ' + resultClass(log.result) + '">' +
+                    safe(log.result) +
+                '</span></td>';
+
+            body.appendChild(tr);
+        });
+
+        const ids = logs.map(log => Number(log.id) || 0);
+
+        lastTopId = ids.length
+            ? Math.max(...ids)
+            : lastTopId;
+
+        document.getElementById('event-count').textContent = logs.length;
+
+        document.getElementById('granted-count').textContent =
+            logs.filter(log => log.result === 'Granted').length;
+
+        document.getElementById('failed-count').textContent =
+            logs.filter(log => ['Failed', 'Denied'].includes(log.result)).length;
+    }
+
+    // Fetch the latest audit records from the Flask endpoint.
+    async function refresh() {
+        if (busy) return;
+
+        busy = true;
+
+        try {
+            const response = await fetch(
+                '{{ url_for("audit_logs_feed") }}',
+                {
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    cache: 'no-store'
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error('feed unavailable');
+            }
+
+            const data = await response.json();
+
+            if (data.enabled) {
+                render(data.logs);
+
+                status.textContent = 'Live · connected';
+                foot.textContent = 'Connected';
+
+                document
+                    .getElementById('feed-status')
+                    .classList.remove('paused');
+            } else {
+                status.textContent = 'Paused in settings';
+                foot.textContent = 'Real-time audit is disabled';
+
+                document
+                    .getElementById('feed-status')
+                    .classList.add('paused');
+            }
+
+            sync.textContent = new Date().toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+        } catch (error) {
+            status.textContent = 'Reconnecting';
+            foot.textContent = 'Could not reach feed';
+
+            document
+                .getElementById('feed-status')
+                .classList.add('paused');
+
+        } finally {
+            busy = false;
+        }
+    }
+
+    // Connect the manual refresh button to the feed.
+    document
+        .getElementById('refresh-feed')
+        .addEventListener('click', refresh);
+
+    // Load the feed immediately and refresh every eight seconds.
+    refresh();
+    setInterval(refresh, 8000);
+})();
+</script>
+
+{% endblock %}
