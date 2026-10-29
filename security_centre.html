@@ -1,0 +1,549 @@
+
+{% extends "base.html" %}
+
+{% block title %}Security Centre{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and threat feed connection status -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">
+            ACCESS CONTROL / THREAT MONITORING
+        </div>
+
+        <h1>Security centre</h1>
+
+        <p>
+            Review tracked findings and suspicious activity detected by this Passme application.
+        </p>
+    </div>
+
+    <span class="status-pill" id="threat-feed-status">
+        <span class="dot"></span>
+        <span id="threat-feed-label">Connecting to event feed…</span>
+    </span>
+</div>
+
+<!-- Display the application's threat monitoring status -->
+<div class="telemetry-banner security-live-banner">
+    <div class="telemetry-icon">
+        <i class="fa-solid fa-shield-virus"></i>
+    </div>
+
+    <div class="telemetry-copy">
+        <strong>Application threat detection</strong>
+
+        <span>
+            Monitors requests, authentication failures, CSRF failures, access denials, and repeated missing paths on this Passme instance.
+        </span>
+    </div>
+
+    <div class="feed-status" id="threat-feed-connection">
+        <span class="pulse-dot"></span>
+        <span id="threat-connection-text">Connecting…</span>
+    </div>
+</div>
+
+<!-- Explain the scope and limitations of threat monitoring -->
+<div class="security-scope-note">
+    <i class="fa-solid fa-circle-info"></i>
+
+    This is live telemetry for requests reaching this Passme server, not an internet-wide attack map. Security findings above the event feed may include illustrative coursework records.
+</div>
+
+<!-- Display security event statistics for the last 24 hours -->
+<div class="stats security-event-stats">
+    <article class="card stat">
+        <small>Detection groups · 24 hours</small>
+        <strong id="detection-groups">{{ event_groups }}</strong>
+        <span>Distinct grouped detections</span>
+    </article>
+
+    <article class="card stat">
+        <small>Observed occurrences · 24 hours</small>
+        <strong id="detection-occurrences">{{ event_occurrences }}</strong>
+        <span>Includes repeated attempts</span>
+    </article>
+
+    <article class="card stat">
+        <small>High / critical groups</small>
+        <strong class="danger" id="high-detections">{{ high_count }}</strong>
+        <span>Prioritise for review</span>
+    </article>
+
+    <article class="card stat">
+        <small>Rejected requests · 24 hours</small>
+        <strong id="rejected-detections">{{ rejected_count }}</strong>
+        <span>Includes lockouts, 400, 403 and 404 responses</span>
+    </article>
+</div>
+
+<!-- Display automatically detected security events -->
+<div class="card threat-feed-card">
+    <div class="section-title">
+        <div>
+            <h2>
+                <i class="fa-solid fa-radar section-icon"></i>
+                Automatically detected activity
+            </h2>
+
+            <p>
+                Newest security detections first. Repeated events are grouped and show an occurrence count.
+            </p>
+        </div>
+
+        <!-- Allow users to refresh the event feed manually -->
+        <button
+            class="btn secondary"
+            id="refresh-threat-feed"
+            type="button"
+        >
+            <i class="fa-solid fa-rotate"></i>
+            Refresh now
+        </button>
+    </div>
+
+    <!-- Show event severity, source, request, timing and result -->
+    <div class="table-wrap">
+        <table class="threat-table">
+            <thead>
+                <tr>
+                    <th>SEVERITY</th>
+                    <th>DETECTION</th>
+                    <th>SOURCE IP</th>
+                    <th>REQUEST</th>
+                    <th>FIRST / LAST SEEN</th>
+                    <th>COUNT</th>
+                    <th>RESULT</th>
+                </tr>
+            </thead>
+
+            <!-- Populate the event table from Flask data -->
+            <tbody id="security-event-rows">
+                {% for e in security_events %}
+                <tr>
+                    <td>
+                        <span class="badge {{ e.severity|lower }}">
+                            {{ e.severity }}
+                        </span>
+                    </td>
+
+                    <td class="threat-description">
+                        <strong>{{ e.title }}</strong>
+                        <small>{{ e.category }} · {{ e.details }}</small>
+                    </td>
+
+                    <td>{{ e.source_ip }}</td>
+
+                    <td class="threat-request">
+                        <strong>{{ e.method }}</strong>
+                        <small>{{ e.endpoint }}</small>
+                    </td>
+
+                    <td class="threat-times">
+                        <strong>{{ e.event_time }}</strong>
+                        <small>Last: {{ e.last_seen }}</small>
+                    </td>
+
+                    <td>
+                        <span class="occurrence-count">
+                            {{ e.occurrences }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <span class="badge {{ 'blocked' if 'Blocked' in e.status or 'Rejected' in e.status else 'open' }}">
+                            {{ e.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        No suspicious events have been detected yet. Real request and authentication events will appear here when a detection rule matches.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Display the feed refresh interval and latest sync time -->
+    <div class="table-foot">
+        <span>
+            Automatically refreshes every 5 seconds when real-time audit is enabled.
+        </span>
+
+        <span id="threat-sync-time">Awaiting first sync</span>
+    </div>
+</div>
+
+<!-- Introduce the manually tracked security findings -->
+<div class="section-title tracked-findings-heading">
+    <div>
+        <h2>Tracked security findings</h2>
+
+        <p>
+            Use the status controls to track remediation. These items are separate from automatically detected request events.
+        </p>
+    </div>
+</div>
+
+<!-- Summarize tracked security findings -->
+<div class="stats finding-stats">
+    <article class="card stat">
+        <small>Open critical findings</small>
+        <strong class="danger">{{ critical_count }}</strong>
+        <span>Critical findings not yet resolved</span>
+    </article>
+
+    <article class="card stat">
+        <small>Total tracked findings</small>
+        <strong>{{ findings|length }}</strong>
+        <span>Includes sample coursework findings where present</span>
+    </article>
+</div>
+
+<!-- Display each finding and its remediation controls -->
+{% for f in findings %}
+<article class="card finding">
+    <div class="finding-main">
+        <div class="finding-copy">
+            <!-- Show the finding's severity and current status -->
+            <div class="finding-tags">
+                <span class="badge {{ f.severity|lower|replace(' ', '-') }}">
+                    {{ f.severity }}
+                </span>
+
+                <span class="badge status-badge {{ f.status|lower|replace(' ', '-') }}">
+                    {{ f.status }}
+                </span>
+            </div>
+
+            <!-- Display the finding description and recommended control -->
+            <h2>{{ f.title }}</h2>
+
+            <p class="muted">{{ f.endpoint }}</p>
+
+            <p class="recommendation">
+                <strong>Recommended control:</strong>
+                {{ f.recommendation }}
+            </p>
+        </div>
+
+        <!-- Allow authorized users to update the finding status -->
+        <form
+            class="finding-status-form"
+            method="post"
+            action="{{ url_for('update_finding', finding_id=f.id) }}"
+        >
+            <!-- Include the CSRF protection token -->
+            <input
+                type="hidden"
+                name="_csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <!-- Select the remediation status -->
+            <label for="status-{{ f.id }}">
+                Finding status
+
+                <select id="status-{{ f.id }}" name="status">
+                    {% for status_option in ['Open', 'Pending', 'In Progress', 'Resolved'] %}
+                    <option
+                        value="{{ status_option }}"
+                        {% if f.status == status_option %}selected{% endif %}
+                    >
+                        {{ status_option }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <!-- Submit the updated finding status -->
+            <button class="btn primary" type="submit">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save status
+            </button>
+        </form>
+    </div>
+</article>
+{% else %}
+<!-- Show an empty state when no findings are stored -->
+<article class="card empty-state">
+    <i class="fa-solid fa-shield-check"></i>
+
+    <h2>No tracked findings</h2>
+
+    <p class="muted">
+        No remediation items are currently stored.
+    </p>
+</article>
+{% endfor %}
+
+<!-- Configure the endpoint used by the live security event feed -->
+<div
+    id="security-config"
+    data-endpoint="{{ url_for('security_events_feed') }}"
+    hidden
+></div>
+
+<!-- Handle live event updates and security feed rendering -->
+<script>
+(function () {
+    // Find the event table and connection status elements.
+    const body = document.getElementById('security-event-rows');
+    const label = document.getElementById('threat-feed-label');
+    const statusText = document.getElementById('threat-connection-text');
+    const statusBox = document.getElementById('threat-feed-connection');
+    const sync = document.getElementById('threat-sync-time');
+
+    // Read the Flask endpoint from the HTML data attribute.
+    const config = document.getElementById('security-config');
+    const endpoint = config.dataset.endpoint;
+
+    let busy = false;
+    let previousIds = new Set();
+
+    // Create a table cell using text content to prevent HTML injection.
+    function cell(text, cls) {
+        const td = document.createElement('td');
+
+        if (cls) {
+            td.className = cls;
+        }
+
+        td.textContent = String(text ?? '');
+
+        return td;
+    }
+
+    // Create a status badge using a supplied CSS class.
+    function badge(text, cls) {
+        const el = document.createElement('span');
+
+        el.className = 'badge ' + cls;
+        el.textContent = String(text ?? '');
+
+        return el;
+    }
+
+    // Normalize severity values before using them as CSS classes.
+    function safeSeverity(v) {
+        return String(v || 'low')
+            .toLowerCase()
+            .replace(/[^a-z0-9\_-]/g, '');
+    }
+
+    // Render the latest security events in the table.
+    function render(events) {
+        body.replaceChildren();
+
+        if (!events.length) {
+            const tr = document.createElement('tr');
+
+            const td = cell(
+                'No suspicious events have been detected yet. Real request and authentication events will appear here when a detection rule matches.',
+                'empty-state'
+            );
+
+            td.colSpan = 7;
+
+            tr.appendChild(td);
+            body.appendChild(tr);
+
+            return;
+        }
+
+        events.forEach((e, index) => {
+            const tr = document.createElement('tr');
+
+            // Highlight a newly received event.
+            if (
+                index === 0 &&
+                !previousIds.has(Number(e.id)) &&
+                previousIds.size
+            ) {
+                tr.className = 'new-event-row';
+            }
+
+            // Display the event severity.
+            const sev = cell('');
+
+            sev.appendChild(
+                badge(e.severity, safeSeverity(e.severity))
+            );
+
+            tr.appendChild(sev);
+
+            // Display the detection title and details.
+            const detection = cell('', 'threat-description');
+
+            const title = document.createElement('strong');
+            title.textContent = e.title || 'Security event';
+
+            const details = document.createElement('small');
+            details.textContent =
+                (e.category || '') + ' · ' + (e.details || '');
+
+            detection.append(title, details);
+            tr.appendChild(detection);
+
+            // Display the source IP address.
+            tr.appendChild(
+                cell(e.source_ip, 'threat-source')
+            );
+
+            // Display the HTTP method and requested endpoint.
+            const req = cell('', 'threat-request');
+
+            const method = document.createElement('strong');
+            method.textContent = e.method || '';
+
+            const path = document.createElement('small');
+            path.textContent = e.endpoint || '';
+
+            req.append(method, path);
+            tr.appendChild(req);
+
+            // Display when the event was first and last observed.
+            const times = cell('', 'threat-times');
+
+            const first = document.createElement('strong');
+            first.textContent = e.event_time || '';
+
+            const last = document.createElement('small');
+            last.textContent = 'Last: ' + (e.last_seen || '');
+
+            times.append(first, last);
+            tr.appendChild(times);
+
+            // Display the number of grouped occurrences.
+            const count = cell('');
+
+            const num = document.createElement('span');
+            num.className = 'occurrence-count';
+            num.textContent = String(e.occurrences ?? 1);
+
+            count.appendChild(num);
+            tr.appendChild(count);
+
+            // Display whether the request was blocked or observed.
+            const status = cell('');
+            const st = String(e.status || 'Observed');
+
+            const statusClass =
+                (
+                    st.includes('Blocked') ||
+                    st.includes('Rejected')
+                )
+                    ? 'blocked'
+                    : 'open';
+
+            status.appendChild(
+                badge(st, statusClass)
+            );
+
+            tr.appendChild(status);
+            body.appendChild(tr);
+        });
+
+        // Store event IDs to identify new detections on the next refresh.
+        previousIds = new Set(
+            events.map(e => Number(e.id))
+        );
+    }
+
+    // Update the security statistics returned by the feed.
+    function updateStats(stats) {
+        document.getElementById('detection-groups').textContent =
+            stats.groups ?? 0;
+
+        document.getElementById('detection-occurrences').textContent =
+            stats.occurrences ?? 0;
+
+        document.getElementById('high-detections').textContent =
+            stats.high ?? 0;
+
+        document.getElementById('rejected-detections').textContent =
+            stats.rejected ?? 0;
+    }
+
+    // Fetch the latest events and update the monitoring status.
+    async function refresh() {
+        if (busy) {
+            return;
+        }
+
+        busy = true;
+
+        try {
+            const response = await fetch(endpoint, {
+                headers: {
+                    'Accept': 'application/json'
+                },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                throw new Error('feed unavailable');
+            }
+
+            const data = await response.json();
+
+            if (data.enabled) {
+                render(data.events || []);
+                updateStats(data.stats || {});
+
+                label.textContent = 'Live request monitoring';
+
+                statusText.textContent =
+                    'Connected · refreshes every 5 seconds';
+
+                statusBox.classList.remove('paused');
+            } else {
+                label.textContent = 'Automatic refresh paused';
+
+                statusText.textContent =
+                    'Real-time audit disabled in Settings';
+
+                statusBox.classList.add('paused');
+            }
+
+            // Record the time of the latest successful feed response.
+            sync.textContent =
+                'Last sync: ' +
+                new Date().toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+
+        } catch (err) {
+            // Display a connection warning if the feed request fails.
+            label.textContent = 'Reconnecting to event feed';
+
+            statusText.textContent =
+                'Feed temporarily unavailable';
+
+            statusBox.classList.add('paused');
+
+        } finally {
+            busy = false;
+        }
+    }
+
+    // Connect the manual refresh button to the feed update function.
+    document
+        .getElementById('refresh-threat-feed')
+        .addEventListener('click', refresh);
+
+    // Load the feed immediately and refresh it every five seconds.
+    refresh();
+
+    setInterval(refresh, 5000);
+})();
+</script>
+
+{% endblock %}
