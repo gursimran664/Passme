@@ -1,0 +1,177 @@
+
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+
+<!-- Page heading and user management description -->
+<div class="page-heading">
+    <div>
+        <div class="breadcrumb">ACCESS CONTROL</div>
+        <h1>User management</h1>
+        <p>Create accounts and assign one flat RBAC role.</p>
+    </div>
+</div>
+
+<!-- Provide a form to create a new user account -->
+<div class="card">
+
+    <h2>Add a user</h2>
+
+    <p class="muted">
+        New users need a temporary password of at least 12 characters.
+    </p>
+
+    <form
+        class="inline-form"
+        method="post"
+        action="{{ url_for('add_user') }}"
+    >
+
+        <!-- Include the CSRF protection token -->
+        <input
+            type="hidden"
+            name="_csrf_token"
+            value="{{ csrf_token }}"
+        >
+
+        <!-- Collect the user's full name -->
+        <label>
+            Full name
+            <input
+                type="text"
+                name="name"
+                required
+                maxlength="100"
+                placeholder="Sarah Connor"
+                autocomplete="name"
+            >
+        </label>
+
+        <!-- Collect the user's email address -->
+        <label>
+            Email
+            <input
+                type="email"
+                name="email"
+                required
+                maxlength="254"
+                placeholder="sarah@example.com"
+                autocomplete="email"
+            >
+        </label>
+
+        <!-- Set a temporary password for the new account -->
+        <label>
+            Temporary password
+            <input
+                type="password"
+                name="password"
+                required
+                minlength="12"
+                maxlength="72"
+                autocomplete="new-password"
+            >
+        </label>
+
+        <!-- Assign a role to the new user -->
+        <label>
+            Role
+            <select name="role" required>
+                {% for role in roles %}
+                <option value="{{ role }}">{{ role }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <!-- Submit the new user account -->
+        <button class="btn primary" type="submit">
+            <i class="fa-solid fa-user-plus"></i>
+            Create user
+        </button>
+
+    </form>
+
+</div>
+
+<!-- Display all registered user accounts -->
+<div class="card">
+
+    <div class="section-title">
+        <div>
+            <h2>Accounts</h2>
+            <p>{{ users|length }} account(s) in the database.</p>
+        </div>
+    </div>
+
+    <!-- Show account details in a table -->
+    <div class="table-wrap">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Last active</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for u in users %}
+                <tr>
+
+                    <!-- Display the user's name, initials and email -->
+                    <td>
+                        <div class="user-cell">
+
+                            <span class="avatar">
+                                {{ u.initials }}
+                            </span>
+
+                            <span>
+                                <strong>{{ u.name }}</strong>
+                                <small>{{ u.email }}</small>
+                            </span>
+
+                        </div>
+                    </td>
+
+                    <!-- Display the assigned access control role -->
+                    <td>
+                        {{ u.role }}
+                    </td>
+
+                    <!-- Display the account status -->
+                    <td>
+                        <span class="badge {{ u.status|lower }}">
+                            {{ u.status }}
+                        </span>
+                    </td>
+
+                    <!-- Display the user's last activity time -->
+                    <td>
+                        {{ u.last_active or 'Never' }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+                <!-- Show a message when no accounts exist -->
+                <tr>
+                    <td colspan="4">
+                        No accounts.
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}
