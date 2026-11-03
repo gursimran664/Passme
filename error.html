@@ -1,0 +1,27 @@
+
+{% extends "base.html" %}
+
+{% block title %}
+    Error {{ code }}
+{% endblock %}
+
+{% block content %}
+
+<!-- Error message card -->
+<div class="card error-card">
+    <!-- Display the HTTP error code -->
+    <span class="error-code">{{ code }}</span>
+
+    <!-- Error heading -->
+    <h1>Request unavailable</h1>
+
+    <!-- Error description -->
+    <p>{{ message }}</p>
+
+    <!-- Return to the main Passme page -->
+    <a class="btn secondary" href="{{ url_for('index') }}">
+        Return to Passme
+    </a>
+</div>
+
+{% endblock %}
